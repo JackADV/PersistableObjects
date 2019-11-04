@@ -730,6 +730,7 @@ MonoBehaviour:
   storage: {fileID: 633951431}
   shapes: []
   prefab: {fileID: 0}
+  spawnZone: {fileID: 0}
 --- !u!4 &879031718
 Transform:
   m_ObjectHideFlags: 0

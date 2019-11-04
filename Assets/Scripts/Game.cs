@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class Game : PersistableObject
 {
-    public ShapeFactory shapeFactory; // The object we will be spawning
+    [SerializeField] ShapeFactory shapeFactory; // The object we will be spawning
     public KeyCode createKey = KeyCode.C; // Giving keys functionality
     public KeyCode newGameKey = KeyCode.N; // Giving keys functionality
     public KeyCode saveKey = KeyCode.S; // Giving keys functionality
@@ -17,6 +17,8 @@ public class Game : PersistableObject
     public PersistableObject prefab;
     List<PersistableObject> objects;
     float creationProgress, destructionProgress;
+    public SpawnZone SpawnZoneOfLevel { get; set; }
+    public static Game Instance { get; private set; }
 
     public float CreationSpeed { get; set; }
     public float DestructionSpeed { get; set; }
@@ -25,7 +27,10 @@ public class Game : PersistableObject
     {
         objects = new List<PersistableObject>();
     }
-
+    private void OnEnable()
+    {
+        Instance = this;
+    }
     // Update is called once per frame
     void Update()
     {
@@ -91,7 +96,8 @@ public class Game : PersistableObject
     {
         Shape instance = shapeFactory.GetRandom();
         Transform t = instance.transform;
-        t.localPosition = Random.insideUnitSphere * 5f;
+        // t.localPosition = Random.insideUnitSphere * 5f;
+        t.localPosition = SpawnZoneOfLevel.SpawnPoint;
         t.localRotation = Random.rotation;
         t.localScale = Vector3.one * Random.Range(0.1f, 1f);
         instance.SetColor(Random.ColorHSV(hueMin: 0f, hueMax: 1f, saturationMin: 0.5f, saturationMax: 1f, valueMin: 0.25f, valueMax: 1f, alphaMin: 1f, alphaMax: 1f));

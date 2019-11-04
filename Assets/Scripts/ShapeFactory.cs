@@ -55,12 +55,12 @@ public class ShapeFactory : ScriptableObject
             {
                 CreatePools();
             }
-            else
-            {
-                Destroy(shapeToRecycle.gameObject);
-            }
             pools[shapeToRecycle.ShapeId].Add(shapeToRecycle);
             shapeToRecycle.gameObject.SetActive(false);
+        }
+        else
+        {
+            Destroy(shapeToRecycle.gameObject);
         }
     }
 
