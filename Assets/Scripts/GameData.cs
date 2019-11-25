@@ -13,7 +13,10 @@ public class GameDataWriter
     {
         this.writer = writer;
     }
-
+    public void Write(Random.State value)
+    {
+        writer.Write(JsonUtility.ToJson(value));
+    }
     public void Write(float value)
     {
         writer.Write(value);
@@ -58,7 +61,10 @@ public class GameDataReader
         this.reader = reader;
         this.Version = version;
     }
-
+    public Random.State ReadRandomState()
+    {
+        return JsonUtility.FromJson<Random.State>(reader.ReadString());
+    }
     public float ReadFloat()
     {
         return reader.ReadSingle();

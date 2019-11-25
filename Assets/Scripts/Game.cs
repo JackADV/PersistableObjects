@@ -1,9 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class Game : PersistableObject
 {
+    [SerializeField] Slider creationSpeedSlider;
+    [SerializeField] Slider destructionSpeedSlider;
+    [SerializeField] bool reseedOnLoad;
     [SerializeField] ShapeFactory shapeFactory; // The object we will be spawning
     public KeyCode createKey = KeyCode.C; // Giving keys functionality
     public KeyCode newGameKey = KeyCode.N; // Giving keys functionality
@@ -11,26 +16,60 @@ public class Game : PersistableObject
     public KeyCode loadkey = KeyCode.L; // Giving keys functionality
     public KeyCode destroyKey = KeyCode.X; // Giving keys functionality
     public PersistantStorage storage; // Where the data is saving and loading form
-    const int saveVersion = 1;
+    const int saveVersion = 3;
     public List<Shape> shapes; // The list of objects with the Persistableobjects script
     private string savePath; // Telling the game where to save
     public PersistableObject prefab;
     List<PersistableObject> objects;
     float creationProgress, destructionProgress;
-    public SpawnZone SpawnZoneOfLevel { get; set; }
+    public int levelCount;
+    int loadedLevelBuildIndex;
     public static Game Instance { get; private set; }
 
     public float CreationSpeed { get; set; }
     public float DestructionSpeed { get; set; }
+    Random.State mainRandomState;
     //public PersistantStorage storage;
-    void Awake()
+    void Start()
     {
         objects = new List<PersistableObject>();
+        if (Application.isEditor)
+        {
+            //Scene loadedLevel = SceneManager.GetSceneByName("Level 1");
+            //if (loadedLevel.isLoaded)
+            //{
+            //    SceneManager.SetActiveScene(loadedLevel);
+            //    return;
+            //}
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene loadedScene = SceneManager.GetSceneAt(i);
+                if (loadedScene.name.Contains("Level"))
+                {
+                    SceneManager.SetActiveScene(loadedScene);
+                    loadedLevelBuildIndex = loadedScene.buildIndex;
+                    return;
+                }
+            }
+        }
+
+        mainRandomState = Random.state;
+        BeginNewGame();
+        StartCoroutine(LoadLevel(1));
     }
-    private void OnEnable()
+    IEnumerator LoadLevel(int levelBuildIndex)
     {
-        Instance = this;
+        enabled = false;
+        if (loadedLevelBuildIndex > 0)
+        {
+            yield return SceneManager.UnloadSceneAsync(loadedLevelBuildIndex);
+        }
+        yield return SceneManager.LoadSceneAsync(levelBuildIndex, LoadSceneMode.Additive);
+        SceneManager.SetActiveScene(SceneManager.GetSceneByBuildIndex(levelBuildIndex));
+        loadedLevelBuildIndex = levelBuildIndex;
+        enabled = true;
     }
+
     // Update is called once per frame
     void Update()
     {
@@ -45,6 +84,7 @@ public class Game : PersistableObject
         else if (Input.GetKey(newGameKey))
         {
             BeginNewGame(); // Clears cubes
+            StartCoroutine(LoadLevel(loadedLevelBuildIndex));
         }
         else if (Input.GetKeyDown(saveKey))
         {
@@ -57,19 +97,37 @@ public class Game : PersistableObject
             storage.Load(this);
             // Loads game
         }
+        else
+        {
+            for (int i = 0; i < levelCount; i++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha0 + i))
+                {
+                    BeginNewGame();
+                    StartCoroutine(LoadLevel(i));
+                    return;
+                }
+            }
+        }
+    }
+    private void FixedUpdate()
+    {
         creationProgress += Time.deltaTime * CreationSpeed; // Allows you to speed up the creation process
         while (creationProgress >= 1f)
         {
             creationProgress -= 1f;
             CreateShape();
+            destructionProgress += Time.deltaTime * DestructionSpeed;
+            while (destructionProgress >= 1f)
+            {
+                destructionProgress -= 1f;
+                DestroyShape();
+            }
+
         }
-        destructionProgress += Time.deltaTime * DestructionSpeed;
-        while (destructionProgress >= 1f)
-        {
-            destructionProgress -= 1f;
-            DestroyShape();
-        }
+
     }
+
     //void CreateObject() // Function to create the shapes
     //{
     //    PersistableObject o = Instantiate(prefab);
@@ -97,7 +155,7 @@ public class Game : PersistableObject
         Shape instance = shapeFactory.GetRandom();
         Transform t = instance.transform;
         // t.localPosition = Random.insideUnitSphere * 5f;
-        t.localPosition = SpawnZoneOfLevel.SpawnPoint;
+        t.localPosition = GameLevel.Current.SpawnPoint;
         t.localRotation = Random.rotation;
         t.localScale = Vector3.one * Random.Range(0.1f, 1f);
         instance.SetColor(Random.ColorHSV(hueMin: 0f, hueMax: 1f, saturationMin: 0.5f, saturationMax: 1f, valueMin: 0.25f, valueMax: 1f, alphaMin: 1f, alphaMax: 1f));
@@ -105,6 +163,12 @@ public class Game : PersistableObject
     }
     private void BeginNewGame()
     {
+        Random.state = mainRandomState;
+        int seed = Random.Range(0, int.MaxValue) ^ (int)Time.unscaledTime;
+        mainRandomState = Random.state;
+        Random.InitState(seed);
+        CreationSpeed = 0;
+        DestructionSpeed = 0;
         for (int i = 0; i < shapes.Count; i++)
         {
             // Destroys each item
@@ -119,6 +183,13 @@ public class Game : PersistableObject
     {
 
         writer.Write(shapes.Count);
+        writer.Write(Random.state);
+        writer.Write(CreationSpeed);
+        writer.Write(creationProgress);
+        writer.Write(DestructionSpeed);
+        writer.Write(destructionProgress);
+        writer.Write(loadedLevelBuildIndex);
+        GameLevel.Current.Save(writer);
         // Loop through all objects
         for (int i = 0; i < shapes.Count; i++)
         {
@@ -133,10 +204,31 @@ public class Game : PersistableObject
     {
         int version = reader.Version;
         int count = version <= 0 ? -version : reader.ReadInt();
+        StartCoroutine(LoadLevel(version < 2 ? 1 : reader.ReadInt()));
         if (version > saveVersion)
         {
             Debug.Log("Unsupported future save version " + version);
             return;
+        }
+        StartCoroutine(LoadGame(reader));
+    }
+    IEnumerator LoadGame(GameDataReader reader)
+    {
+        int version = reader.Version;
+        int count = version <= 0 ? -version : reader.ReadInt();
+        yield return LoadLevel(version < 2 ? 1 : reader.ReadInt());
+        if (version >= 3)
+        {
+            GameLevel.Current.Load(reader);
+            Random.State state = reader.ReadRandomState();
+            if (!reseedOnLoad)
+            {
+                Random.state = state;
+            }
+            CreationSpeed = reader.ReadFloat();
+            creationProgress = reader.ReadFloat();
+            DestructionSpeed = reader.ReadFloat();
+            destructionProgress = reader.ReadFloat();
         }
         for (int i = 0; i < count; i++) // Loads the correct shapes according to their id
         {
