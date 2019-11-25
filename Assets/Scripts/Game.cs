@@ -16,7 +16,7 @@ public class Game : PersistableObject
     public KeyCode loadkey = KeyCode.L; // Giving keys functionality
     public KeyCode destroyKey = KeyCode.X; // Giving keys functionality
     public PersistantStorage storage; // Where the data is saving and loading form
-    const int saveVersion = 3;
+    const int saveVersion = 4;
     public List<Shape> shapes; // The list of objects with the Persistableobjects script
     private string savePath; // Telling the game where to save
     public PersistableObject prefab;
@@ -112,6 +112,10 @@ public class Game : PersistableObject
     }
     private void FixedUpdate()
     {
+        for (int i = 0; i < shapes.Count; i++)
+        {
+            shapes[i].GameUpdate();
+        }
         creationProgress += Time.deltaTime * CreationSpeed; // Allows you to speed up the creation process
         while (creationProgress >= 1f)
         {
@@ -155,10 +159,7 @@ public class Game : PersistableObject
         Shape instance = shapeFactory.GetRandom();
         Transform t = instance.transform;
         // t.localPosition = Random.insideUnitSphere * 5f;
-        t.localPosition = GameLevel.Current.SpawnPoint;
-        t.localRotation = Random.rotation;
-        t.localScale = Vector3.one * Random.Range(0.1f, 1f);
-        instance.SetColor(Random.ColorHSV(hueMin: 0f, hueMax: 1f, saturationMin: 0.5f, saturationMax: 1f, valueMin: 0.25f, valueMax: 1f, alphaMin: 1f, alphaMax: 1f));
+        GameLevel.Current.ConfigureSpawn(instance);
         shapes.Add(instance);
     }
     private void BeginNewGame()
@@ -167,8 +168,8 @@ public class Game : PersistableObject
         int seed = Random.Range(0, int.MaxValue) ^ (int)Time.unscaledTime;
         mainRandomState = Random.state;
         Random.InitState(seed);
-        CreationSpeed = 0;
-        DestructionSpeed = 0;
+        creationSpeedSlider.value = CreationSpeed = 0;
+        destructionSpeedSlider.value = DestructionSpeed = 0;
         for (int i = 0; i < shapes.Count; i++)
         {
             // Destroys each item
@@ -225,9 +226,9 @@ public class Game : PersistableObject
             {
                 Random.state = state;
             }
-            CreationSpeed = reader.ReadFloat();
+            creationSpeedSlider.value = CreationSpeed = reader.ReadFloat();
             creationProgress = reader.ReadFloat();
-            DestructionSpeed = reader.ReadFloat();
+            destructionSpeedSlider.value = DestructionSpeed = reader.ReadFloat();
             destructionProgress = reader.ReadFloat();
         }
         for (int i = 0; i < count; i++) // Loads the correct shapes according to their id

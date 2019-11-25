@@ -23,12 +23,9 @@ public class GameLevel : PersistableObject
             persistentObjects[i].Load(reader);
         }
     }
-    public Vector3 SpawnPoint
+    public void ConfigureSpawn(Shape shape)
     {
-        get
-        {
-            return spawnZone.SpawnPoint;
-        }
+        spawnZone.ConfigureSpawn(shape);
     }
     public static GameLevel Current { get; private set; }
 

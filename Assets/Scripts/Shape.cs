@@ -24,6 +24,13 @@ public class Shape : PersistableObject
             }
         }
     }
+    public Vector3 AngularVelocity { get; set; }
+    public Vector3 Velocity { get; set; }
+    public void GameUpdate()
+    {
+        transform.Rotate(AngularVelocity * 50f * Time.deltaTime);
+        transform.localPosition += Velocity * Time.deltaTime;
+    }
 
     Color color; // Reference to the colour
     static int colorPropertyId = Shader.PropertyToID("_Color");
@@ -55,11 +62,15 @@ public class Shape : PersistableObject
     {
         base.Save(writer);
         writer.Write(color);
+        writer.Write(AngularVelocity);
+        writer.Write(Velocity);
     }
 
     public override void Load(GameDataReader reader) // Loads the colour
     {
         base.Load(reader);
         SetColor(reader.Version > 0 ? reader.ReadColor() : Color.white);
+        AngularVelocity = reader.Version >= 4 ? reader.ReadVector3() : Vector3.zero;
+        Velocity = reader.Version >= 4 ? reader.ReadVector3() : Vector3.zero;
     }
 }
